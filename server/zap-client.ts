@@ -60,14 +60,14 @@ export class ZapClient {
         }
       } catch (error: any) {
         const delay = initialDelay * Math.pow(1.5, i); // Exponential backoff
-        console.log(`[ZAP] ⏳ Attempt ${i + 1} failed: ${error.message}. Retrying in ${Math.round(delay/1000)}s...`);
-        
+        console.log(`[ZAP] ⏳ Attempt ${i + 1} failed: ${error.message}. Retrying in ${Math.round(delay / 1000)}s...`);
+
         if (i < maxAttempts - 1) {
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
     }
-    
+
     console.error('[ZAP] ❌ Daemon failed to start within timeout');
     return false;
   }
@@ -76,57 +76,58 @@ export class ZapClient {
    * Start an active scan on the target URL
    * Returns scan ID
    */
-  async startScan(targetUrl: string): Promise<string> {
-  try {
-    console.log(`[ZAP] Starting active scan for ${targetUrl}`);
-    
-    // First, add URL to context
-    const encodedUrl = encodeURIComponent(targetUrl);
-    
-    // Step 1: Access the URL first (important!)
+  async startScan(targetUrl: string, profile: string = "quick"): Promise<string> {
     try {
-      await this.client.get(
-        `${this.baseUrl}/JSON/core/action/accessUrl?url=${encodedUrl}`,
+      console.log(`[ZAP] Starting active scan for ${targetUrl}`);
+
+      // First, add URL to context
+      const encodedUrl = encodeURIComponent(targetUrl);
+
+      // Step 1: Access the URL first (important!)
+      try {
+        await this.client.get(
+          `${this.baseUrl}/JSON/core/action/accessUrl?url=${encodedUrl}`,
+          { timeout: 30000 }
+        );
+        console.log(`[ZAP] ✅ URL accessed: ${targetUrl}`);
+      } catch (err) {
+        console.log(`[ZAP] ⚠️  Could not access URL directly, continuing...`);
+      }
+
+      // Step 2: Spider the target (optional but recommended)
+      try {
+        const maxChildren = profile === "full" ? 0 : 10;
+        const spiderResponse = await this.client.get(
+          `${this.baseUrl}/JSON/spider/action/scan?url=${encodedUrl}&maxChildren=${maxChildren}&recurse=true`,
+          { timeout: 30000 }
+        );
+        const spiderScanId = spiderResponse.data.scan;
+        console.log(`[ZAP] Spider started with ID: ${spiderScanId}`);
+
+        // Wait for spider to complete
+        await this.waitForSpider(spiderScanId);
+      } catch (err: any) {
+        console.log(`[ZAP] ⚠️  Spider failed or timed out: ${err.message}, continuing with active scan...`);
+      }
+
+      // Step 3: Start active scan (removed inScopeOnly parameter)
+      const response = await this.client.get(
+        `${this.baseUrl}/JSON/ascan/action/scan?url=${encodedUrl}&recurse=true`,
         { timeout: 30000 }
       );
-      console.log(`[ZAP] ✅ URL accessed: ${targetUrl}`);
-    } catch (err) {
-      console.log(`[ZAP] ⚠️  Could not access URL directly, continuing...`);
-    }
 
-    // Step 2: Spider the target (optional but recommended)
-    try {
-      const spiderResponse = await this.client.get(
-        `${this.baseUrl}/JSON/spider/action/scan?url=${encodedUrl}&maxChildren=10&recurse=true`,
-        { timeout: 30000 }
-      );
-      const spiderScanId = spiderResponse.data.scan;
-      console.log(`[ZAP] Spider started with ID: ${spiderScanId}`);
-      
-      // Wait for spider to complete
-      await this.waitForSpider(spiderScanId);
-    } catch (err: any) {
-      console.log(`[ZAP] ⚠️  Spider failed or timed out: ${err.message}, continuing with active scan...`);
+      const scanId = response.data.scan;
+      console.log(`[ZAP] ✅ Active scan started with ID: ${scanId}`);
+      return String(scanId);
+    } catch (error: any) {
+      console.error("[ZAP] Failed to start scan:", error.message);
+      if (error.response) {
+        console.error("[ZAP] Response data:", error.response.data);
+        console.error("[ZAP] Response status:", error.response.status);
+      }
+      throw new Error(`ZAP scan initiation failed: ${error.message}`);
     }
-
-    // Step 3: Start active scan (removed inScopeOnly parameter)
-    const response = await this.client.get(
-      `${this.baseUrl}/JSON/ascan/action/scan?url=${encodedUrl}&recurse=true`,
-      { timeout: 30000 }
-    );
-    
-    const scanId = response.data.scan;
-    console.log(`[ZAP] ✅ Active scan started with ID: ${scanId}`);
-    return String(scanId);
-  } catch (error: any) {
-    console.error("[ZAP] Failed to start scan:", error.message);
-    if (error.response) {
-      console.error("[ZAP] Response data:", error.response.data);
-      console.error("[ZAP] Response status:", error.response.status);
-    }
-    throw new Error(`ZAP scan initiation failed: ${error.message}`);
   }
-}
 
   /**
    * Poll spider status until completion
@@ -177,9 +178,9 @@ export class ZapClient {
         );
         const progress = parseInt(response.data.status, 10);
         console.log(`[ZAP] Scan ${scanId} progress: ${progress}%`);
-        
+
         if (onProgress) {
-            onProgress(progress);
+          onProgress(progress);
         }
 
         if (progress === 100) {
@@ -250,7 +251,7 @@ export class ZapClient {
   /**
    * Perform a complete scan: start, wait, and retrieve results
    */
-  async performScan(targetUrl: string, onProgress?: (progress: number) => void): Promise<ZapScanResult> {
+  async performScan(targetUrl: string, profile: string, onProgress?: (progress: number) => void): Promise<ZapScanResult> {
     // Check if ZAP is ready with retry
     const ready = await this.isReady();
     if (!ready) {
@@ -259,7 +260,7 @@ export class ZapClient {
 
     try {
       // Start the scan
-      const scanId = await this.startScan(targetUrl);
+      const scanId = await this.startScan(targetUrl, profile);
 
       // Wait for completion
       await this.waitForScan(scanId, 600000, onProgress);

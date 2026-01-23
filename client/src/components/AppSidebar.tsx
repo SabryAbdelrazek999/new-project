@@ -21,6 +21,7 @@ import {
   Info,
   HelpCircle,
   CircleHelp,
+  GitCompare,
 } from "lucide-react";
 import ZapLogo from "./ZapLogo";
 
@@ -30,6 +31,7 @@ const mainMenuItems = [
   { title: "Scan Now", url: "/scan", icon: Search },
   { title: "Scheduling", url: "/scheduling", icon: Calendar },
   { title: "Reports", url: "/reports", icon: FileText },
+  { title: "Compare Scans", url: "/compare", icon: GitCompare },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
@@ -68,9 +70,9 @@ export default function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        
+
         <SidebarSeparator />
-        
+
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>

@@ -20,27 +20,27 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
   try {
     // Validate URL
     const url = new URL(targetUrl);
-    
+
     // Update scan status to running
-    await storage.updateScan(scanId, { 
-      status: "running", 
-      startedAt: new Date() 
+    await storage.updateScan(scanId, {
+      status: "running",
+      startedAt: new Date()
     });
 
     // Use ZAP daemon to perform the scan
     console.log(`[Scanner] Running ZAP scan for ${targetUrl}`);
-    const zapResult = await zapClient.performScan(targetUrl, async (progress) => {
-        // Update scan progress
-        await storage.updateScan(scanId, { progress });
+    const zapResult = await zapClient.performScan(targetUrl, scanType, async (progress) => {
+      // Update scan progress
+      await storage.updateScan(scanId, { progress });
     });
-    
+
     // Convert ZAP vulnerabilities to our format and add scanId
     const zapVulnerabilities = zapResult.vulnerabilities.map((vuln) => ({
       ...vuln,
       scanId,
       affectedUrl: vuln.affectedUrl || targetUrl,
     } as InsertVulnerability));
-    
+
     vulnerabilities.push(...zapVulnerabilities);
 
     // Count severities from ZAP results
@@ -108,7 +108,7 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
   } catch (error: any) {
     // Handle scan errors
     const errorMessage = error.message || "Unknown error occurred";
-    
+
     try {
       await storage.updateScan(scanId, {
         status: "failed",

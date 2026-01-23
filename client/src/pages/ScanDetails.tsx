@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download, Loader2, CheckCircle, AlertTriangle, ArrowLeft, Printer } from "lucide-react";
+import { Download, Loader2, CheckCircle, AlertTriangle, ArrowLeft, Printer, Globe } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Scan, Vulnerability, Report } from "@shared/schema";
@@ -144,74 +145,97 @@ export default function ScanDetails() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {(scanData.status === "running" || scanData.status === "pending") && (
-            <div className="space-y-2 mb-6">
-              <div className="flex justify-between text-sm">
-                <span>Progress</span>
-                <span>{scanData.progress || 0}%</span>
-              </div>
-              <Progress value={scanData.progress || 0} className="h-2" />
-            </div>
-          )}
+          <Tabs defaultValue="findings" className="w-full">
+            <TabsList>
+              <TabsTrigger value="findings">Vulnerabilities</TabsTrigger>
+              <TabsTrigger value="surface">Attack Surface (Vulnerable)</TabsTrigger>
+            </TabsList>
 
-          {scanData.status === "completed" && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-              <div className="text-center p-3 bg-muted/50 rounded-md">
-                <p className="text-2xl font-bold text-foreground">{scanData.totalVulnerabilities}</p>
-                <p className="text-xs text-muted-foreground">Total</p>
-              </div>
-              <div className="text-center p-3 bg-destructive/10 rounded-md">
-                <p className="text-2xl font-bold text-destructive">{scanData.criticalCount}</p>
-                <p className="text-xs text-muted-foreground">Critical</p>
-              </div>
-              <div className="text-center p-3 bg-orange-500/10 rounded-md">
-                <p className="text-2xl font-bold text-orange-500">{scanData.highCount}</p>
-                <p className="text-xs text-muted-foreground">High</p>
-              </div>
-              <div className="text-center p-3 bg-yellow-500/10 rounded-md">
-                <p className="text-2xl font-bold text-yellow-500">{scanData.mediumCount}</p>
-                <p className="text-xs text-muted-foreground">Medium</p>
-              </div>
-              <div className="text-center p-3 bg-primary/10 rounded-md">
-                <p className="text-2xl font-bold text-primary">{scanData.lowCount}</p>
-                <p className="text-xs text-muted-foreground">Low</p>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Vulnerabilities</h3>
-            {!scanData.vulnerabilities || scanData.vulnerabilities.length === 0 ? (
-              <p className="text-muted-foreground italic">No vulnerabilities found yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {scanData.vulnerabilities.map((vuln, index) => (
-                  <div
-                    key={index}
-                    className="p-4 bg-muted/30 rounded-md border border-border"
-                  >
-                    <div className="flex items-start gap-3">
-                      <Badge variant={vuln.severity === "critical" || vuln.severity === "high" ? "destructive" : "secondary"}>
-                        {vuln.severity.toUpperCase()}
-                      </Badge>
-                      <div className="flex-1">
-                        <p className="font-medium">{vuln.title}</p>
-                        <p className="text-sm text-muted-foreground mt-1">{vuln.description}</p>
-                        <p className="text-xs font-mono text-muted-foreground mt-2">
-                          Affected: {vuln.affectedUrl}
-                        </p>
-                        {vuln.remediation && (
-                          <p className="text-sm text-primary mt-2">
-                            <strong>Fix:</strong> {vuln.remediation}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+            <TabsContent value="findings">
+              {(scanData.status === "running" || scanData.status === "pending") && (
+                <div className="space-y-2 mb-6">
+                  <div className="flex justify-between text-sm">
+                    <span>Progress</span>
+                    <span>{scanData.progress || 0}%</span>
                   </div>
-                ))}
+                  <Progress value={scanData.progress || 0} className="h-2" />
+                </div>
+              )}
+
+              {scanData.status === "completed" && (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                  <div className="text-center p-3 bg-muted/50 rounded-md">
+                    <p className="text-2xl font-bold text-foreground">{scanData.totalVulnerabilities}</p>
+                    <p className="text-xs text-muted-foreground">Total</p>
+                  </div>
+                  <div className="text-center p-3 bg-destructive/10 rounded-md">
+                    <p className="text-2xl font-bold text-destructive">{scanData.criticalCount}</p>
+                    <p className="text-xs text-muted-foreground">Critical</p>
+                  </div>
+                  <div className="text-center p-3 bg-orange-500/10 rounded-md">
+                    <p className="text-2xl font-bold text-orange-500">{scanData.highCount}</p>
+                    <p className="text-xs text-muted-foreground">High</p>
+                  </div>
+                  <div className="text-center p-3 bg-yellow-500/10 rounded-md">
+                    <p className="text-2xl font-bold text-yellow-500">{scanData.mediumCount}</p>
+                    <p className="text-xs text-muted-foreground">Medium</p>
+                  </div>
+                  <div className="text-center p-3 bg-primary/10 rounded-md">
+                    <p className="text-2xl font-bold text-primary">{scanData.lowCount}</p>
+                    <p className="text-xs text-muted-foreground">Low</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Vulnerabilities</h3>
+                {!scanData.vulnerabilities || scanData.vulnerabilities.length === 0 ? (
+                  <p className="text-muted-foreground italic">No vulnerabilities found yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {scanData.vulnerabilities.map((vuln, index) => (
+                      <div
+                        key={index}
+                        className="p-4 bg-muted/30 rounded-md border border-border"
+                      >
+                        <div className="flex items-start gap-3">
+                          <Badge variant={vuln.severity === "critical" || vuln.severity === "high" ? "destructive" : "secondary"}>
+                            {vuln.severity.toUpperCase()}
+                          </Badge>
+                          <div className="flex-1">
+                            <p className="font-medium">{vuln.title}</p>
+                            <p className="text-sm text-muted-foreground mt-1">{vuln.description}</p>
+                            <p className="text-xs font-mono text-muted-foreground mt-2">
+                              Affected: {vuln.affectedUrl}
+                            </p>
+                            {vuln.remediation && (
+                              <p className="text-sm text-primary mt-2">
+                                <strong>Fix:</strong> {vuln.remediation}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </TabsContent>
+
+            <TabsContent value="surface">
+              <div className="p-4 border border-border rounded-md bg-muted/20">
+                <h3 className="mb-4 font-semibold">Vulnerable Paths detected:</h3>
+                <ul className="space-y-2 font-mono text-sm">
+                  {Array.from(new Set(scanData.vulnerabilities?.map(v => v.affectedUrl) || [])).map((url, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-muted-foreground" />
+                      <span>{url}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

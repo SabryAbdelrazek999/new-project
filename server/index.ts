@@ -7,6 +7,8 @@ import { initScheduler } from "./scheduler";
 import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./swagger";
 
 const app = express();
 const httpServer = createServer(app);
@@ -35,11 +37,14 @@ app.use(cors());
 
 // Rate Limiting (100 requests per 15 minutes)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
+  windowMs: 15 * 60 * 1000,
   max: 100,
   message: "Too many requests from this IP, please try again later."
 });
 app.use(limiter);
+
+// API Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

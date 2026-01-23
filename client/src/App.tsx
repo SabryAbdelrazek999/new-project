@@ -21,6 +21,7 @@ import Settings from "@/pages/Settings";
 import About from "@/pages/About";
 import AboutUs from "@/pages/AboutUs";
 import FAQ from "@/pages/FAQ";
+import CompareScans from "@/pages/CompareScans";
 
 function ProtectedRouter() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -53,6 +54,7 @@ function ProtectedRouter() {
               <Route path="/" component={Home} />
               <Route path="/dashboard" component={Dashboard} />
               <Route path="/scan" component={ScanNow} />
+              <Route path="/compare" component={CompareScans} />
               <Route path="/scans/:id" component={ScanDetails} />
               <Route path="/scheduling" component={Scheduling} />
               <Route path="/reports" component={Reports} />
