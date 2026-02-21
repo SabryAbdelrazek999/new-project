@@ -4,9 +4,9 @@ A professional web vulnerability scanning application for detecting security iss
 
 ## 📋 Getting Started
 
-**First time setting up?** See [SETUP.md](SETUP.md) for complete installation instructions.
+**First time setting up?** Follow the Quick Start below.
 
-**Quick overview:** See [DOCKER_SETUP.md](DOCKER_SETUP.md) for Docker details.
+**Quick overview:** Use Docker for easy setup.
 
 ## Quick Start
 
@@ -26,8 +26,6 @@ npm run dev      # Start development server
 ```
 
 Open `http://localhost:5000` in your browser.
-
-**[Full setup guide →](SETUP.md)**
 
 ## Features
 
@@ -149,14 +147,6 @@ npm audit fix --force
   - Fixed: `express`, `qs`, `body-parser`, `glob`, `lodash`, `brace-expansion`, `undici`
   - Remaining: 5 moderate-severity issues in `esbuild`/`vite` (require breaking version changes)
 
-### Audit Reports
-
-Detailed audit reports are saved in:
-- `output/audit-before.json` — Initial vulnerability scan
-- `output/audit-after-fix.json` — After running `npm audit fix`
-
-Open these JSON files to see full details of each vulnerability, affected versions, and remediation paths.
-
 ### Best Practices
 
 - Run `npm audit` regularly during development
@@ -190,7 +180,7 @@ docker-compose logs -f
 docker-compose down
 ```
 
-For detailed Docker instructions, see [DOCKER_SETUP.md](DOCKER_SETUP.md).
+For detailed Docker instructions, see the commands above.
 
 ## API Endpoints
 
@@ -263,7 +253,7 @@ docker-compose up --build
 | No results found | Check ZAP logs: `docker logs zap_daemon` |
 | Empty alerts | Wait longer, ZAP may still be processing |
 
-**[See DEEP_SCAN_FIXES.md](DEEP_SCAN_FIXES.md) for detailed Deep scan improvements**
+For detailed Deep scan improvements, check the troubleshooting section above.
 
 ## License
 
