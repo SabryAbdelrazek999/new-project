@@ -18,6 +18,8 @@ docker-compose up --build
 
 Open `http://localhost:5000` in your browser.
 
+**Note:** You may need to sign up/login to access the scanning features.
+
 ### With Node.js Locally
 
 ```bash
@@ -26,6 +28,8 @@ npm run dev      # Start development server
 ```
 
 Open `http://localhost:5000` in your browser.
+
+**Note:** You may need to sign up/login to access the scanning features.
 
 ## Features
 
