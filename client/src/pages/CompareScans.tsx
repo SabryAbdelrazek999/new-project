@@ -63,7 +63,7 @@ export default function CompareScans() {
                                 <SelectValue placeholder="Select Old Scan" />
                             </SelectTrigger>
                             <SelectContent className="max-h-[400px] overflow-y-auto">
-                                {scans?.slice(0, 10).map(scan => {
+                                {scans?.slice(0, 15).map(scan => {
                                     const dateStr = new Date(scan.startedAt!).toLocaleString('en-US', {
                                         year: 'numeric',
                                         month: '2-digit',
@@ -106,7 +106,7 @@ export default function CompareScans() {
                                 <SelectValue placeholder="Select New Scan" />
                             </SelectTrigger>
                             <SelectContent className="max-h-[400px] overflow-y-auto">
-                                {scans?.slice(0, 10).map(scan => {
+                                {scans?.slice(0, 15).map(scan => {
                                     const dateStr = new Date(scan.startedAt!).toLocaleString('en-US', {
                                         year: 'numeric',
                                         month: '2-digit',

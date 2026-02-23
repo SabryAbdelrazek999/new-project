@@ -84,7 +84,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const user = await storage.createUser({ username, password: hashedPassword });
 
       const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-      res.cookie("token", token, { httpOnly: true, secure: process.env.NODE_ENV === "production",sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000 });
+      res.cookie("token", token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000 });
       res.status(201).json({ user: { id: user.id, username: user.username }, token });
     } catch (error) {
       console.error("Signup error:", error);
@@ -104,7 +104,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!isValid) return res.status(401).json({ error: "Invalid credentials" });
 
       const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-      res.cookie("token", token, { httpOnly: true, secure: process.env.NODE_ENV === "production",sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000 });
+      res.cookie("token", token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000 });
 
       res.json({ user: { id: user.id, username: user.username }, token });
     } catch (error) {
@@ -290,11 +290,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!parsed.success) return res.status(400).json({ error: "Invalid scan data", details: parsed.error });
 
       const scan = await storage.createScan({ ...parsed.data, userId });
-      
+
       // Create and register AbortController before starting scan
       const abortController = new AbortController();
       setScanAbortController(scan.id, abortController);
-      
+
       performScan(scan.id, parsed.data.targetUrl, parsed.data.scanType || "quick", abortController);
       res.status(201).json(scan);
     } catch (error) {
@@ -541,8 +541,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         });
       } else {
         const html = generateHTMLReport(scan, vulns);
+        const hostname = (() => { try { return new URL(scan.targetUrl).hostname; } catch { return scan.targetUrl; } })();
+        const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        const safeFilename = `CyberShield-Report-${hostname}-${dateStr}.html`.replace(/[^a-zA-Z0-9.\-_]/g, '_');
         res.setHeader("Content-Type", "text/html");
-        res.setHeader("Content-Disposition", `attachment; filename="scan-report-${scan.id}.html"`);
+        res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
         res.send(html);
       }
     } catch (error) {
@@ -694,14 +697,28 @@ function generateHTMLReport(scan: any, vulnerabilities: any[]): string {
           <p><strong>Description:</strong> ${escapeHtml(v.description)}</p>
           <p><strong>Affected URL:</strong> ${escapeHtml(v.affectedUrl)}</p>
           ${v.remediation ? `<p><strong>Remediation:</strong> ${escapeHtml(v.remediation)}</p>` : ''}
-          ${v.details && typeof v.details === 'object' ? `
-            <div class="vuln-detail">
-              <strong>Technical Details:</strong><br>
-              ${Object.entries(v.details).filter(([_, value]) => value !== null && value !== undefined).map(([key, value]) => 
-                `<div style="margin: 5px 0;"><strong>${escapeHtml(key)}:</strong> ${escapeHtml(String(value))}</div>`
-              ).join('')}
-            </div>
-          ` : ''}
+          ${v.details && typeof v.details === 'object' ? (() => {
+      const det = v.details as Record<string, any>;
+      const sourceTool = det.sourceTool;
+      const otherEntries = Object.entries(det).filter(([k, val]) => k !== 'sourceTool' && val !== null && val !== undefined);
+      const toolBadgeColor = sourceTool === 'Httpx' ? '#8b5cf6'
+        : sourceTool === 'ZAP' ? '#0ea5e9'
+          : sourceTool === 'Nikto' ? '#f97316'
+            : sourceTool === 'Nmap' ? '#22c55e'
+              : sourceTool === 'System' ? '#14b8a6'
+                : '#64748b';
+      return `
+              <div class="vuln-detail">
+                ${sourceTool ? `<div style="margin-bottom:8px;"><strong>Source Tool:</strong>
+                  <span style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:bold;background:${toolBadgeColor};color:#fff;">${escapeHtml(sourceTool)}</span>
+                </div>` : ''}
+                ${otherEntries.length > 0 ? `<strong>Technical Details:</strong><br>` : ''}
+                ${otherEntries.map(([key, value]) =>
+        `<div style="margin:4px 0;"><strong>${escapeHtml(key)}:</strong> ${escapeHtml(String(value))}</div>`
+      ).join('')}
+              </div>
+            `;
+    })() : ''}
         </div>
       `).join('')}
     </div>

@@ -48,7 +48,7 @@ export default function Home() {
   const { data: recentScans, isLoading: scansLoading } = useQuery<Scan[]>({
     queryKey: ["/api/scans/recent"],
     queryFn: async () => {
-      const response = await fetch("/api/scans/recent?limit=3", {
+      const response = await fetch("/api/scans/recent?limit=5", {
         headers: {
           "Authorization": `Bearer ${localStorage.getItem("token")}`,
         },
@@ -96,6 +96,7 @@ export default function Home() {
     : [];
 
   const recentFindings = (allVulnerabilities || [])
+    .filter(v => v.severity !== 'info')
     .slice(0, 4)
     .map((v, i) => ({
       id: i + 1,
@@ -189,10 +190,12 @@ export default function Home() {
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
+                      backgroundColor: "#1e1e2e",
                       border: "1px solid hsl(var(--border))",
                       borderRadius: "6px",
                     }}
+                    labelStyle={{ color: "#fff", fontWeight: 600 }}
+                    itemStyle={{ color: "#e2e8f0" }}
                   />
                   <Bar dataKey="scans" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="vulnerabilities" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
@@ -231,10 +234,12 @@ export default function Home() {
                       </Pie>
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
+                          backgroundColor: "#1e1e2e",
                           border: "1px solid hsl(var(--border))",
                           borderRadius: "6px",
                         }}
+                        labelStyle={{ color: "#fff", fontWeight: 600 }}
+                        itemStyle={{ color: "#e2e8f0" }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -298,7 +303,7 @@ export default function Home() {
 
       <div className="mt-8">
         <h2 className="text-xl font-semibold text-foreground mb-4">Recent Scans</h2>
-        <ActivityTable activities={recentScans || []} onViewSource={handleViewSource} />
+        <ActivityTable activities={(recentScans || []).slice(0, 5)} onViewSource={handleViewSource} />
       </div>
     </div>
   );

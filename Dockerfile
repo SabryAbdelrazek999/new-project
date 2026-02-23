@@ -31,11 +31,19 @@ RUN git clone --depth 1 https://github.com/sullo/nikto.git /opt/nikto && \
 chmod +x /opt/nikto/program/nikto.pl && \
 echo '#!/bin/sh\nperl /opt/nikto/program/nikto.pl "$@"' > /usr/local/bin/nikto && \
 chmod +x /usr/local/bin/nikto
-RUN curl -L -o httpx.zip https://github.com/projectdiscovery/httpx/releases/download/v1.6.0/httpx_1.6.0_linux_amd64.zip && \
+
+# Install httpx
+RUN set -e; \
+for attempt in 1 2 3; do \
+curl -L -o httpx.zip https://github.com/projectdiscovery/httpx/releases/download/v1.6.7/httpx_1.6.7_linux_amd64.zip && \
 unzip httpx.zip && \
-mv httpx /usr/local/bin/httpx-pd && \
-chmod +x /usr/local/bin/httpx-pd && \
-rm httpx.zip
+mv httpx /usr/local/bin/httpx && \
+chmod +x /usr/local/bin/httpx && \
+rm httpx.zip && \
+break || sleep 5; \
+done && \
+httpx -version
+
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY --from=builder /app/dist ./dist
@@ -43,10 +51,15 @@ COPY --from=builder /app/server ./server
 COPY --from=builder /app/shared ./shared
 COPY migrations ./migrations
 COPY drizzle.config.ts ./
-COPY start.sh ./
-RUN chmod +x ./start.sh
+COPY start.sh .
+RUN chmod +x start.sh
+
 EXPOSE 5000
 ENV NODE_ENV=production
 ENV PORT=5000
+
+# Verify httpx is available
+RUN which httpx && httpx -version
+
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["./start.sh"]
+CMD ["npm", "run", "start"]

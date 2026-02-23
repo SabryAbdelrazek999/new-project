@@ -162,10 +162,10 @@ export class ZapClient {
         let maxChildren: number;
         let maxDepth: number;
         let maxDuration: number;
-        
+
         if (scanDepth === "shallow") {
-          maxChildren = 5;   // 5 children per page
-          maxDepth = 2;      // Only 2 levels deep
+          maxChildren = 10;  // 10 children per page for better coverage
+          maxDepth = 3;      // 3 levels deep
           maxDuration = 5;   // 5 minutes max (increased for flexibility)
         } else if (scanDepth === "deep") {
           maxChildren = 0;   // 0 = unlimited children (thorough crawling)
@@ -176,9 +176,9 @@ export class ZapClient {
           maxDepth = 5;      // 5 levels deep
           maxDuration = 20;  // 20 minutes max (increased for flexibility)
         }
-        
+
         const spiderResponse = await this.client.get(
-          `${this.baseUrl}/JSON/spider/action/scan?url=${encodedUrl}&maxChildren=${maxChildren}&maxDepth=${maxDepth}&maxDuration=${maxDuration}&recurse=true&subtreeOnly=false`,
+          `${this.baseUrl}/JSON/spider/action/scan?url=${encodedUrl}&maxChildren=${maxChildren}&maxDepth=${maxDepth}&maxDuration=${maxDuration}&recurse=true&subtreeOnly=${scanDepth === "shallow" ? "true" : "false"}`,
           { timeout: 60000 }
         );
         const spiderScanId = spiderResponse.data.scan;
@@ -198,7 +198,7 @@ export class ZapClient {
 
       // Step 3: Start active scan with policy and scan settings based on depth
       let scanUrl = `${this.baseUrl}/JSON/ascan/action/scan?url=${encodedUrl}&recurse=true&inScopeOnly=false`;
-      
+
       // Configure scan settings based on depth
       if (scanDepth === "deep") {
         // For deep scans: aggressive settings
@@ -209,11 +209,11 @@ export class ZapClient {
         console.log(`[ZAP] Configuring MEDIUM scan policy (balanced)...`);
         scanUrl += `&policyName=Policy%20standard`;
       } else {
-        // For shallow scans: conservative settings  
-        console.log(`[ZAP] Configuring SHALLOW scan policy (conservative)...`);
-        scanUrl += `&policyName=Policy%20quick`;
+        // For shallow scans: use standard policy for more coverage  
+        console.log(`[ZAP] Configuring SHALLOW scan policy (standard for better coverage)...`);
+        scanUrl += `&policyName=Policy%20standard`;
       }
-      
+
       // Start the scan
       let response;
       try {
@@ -312,7 +312,7 @@ export class ZapClient {
         const progress = parseInt(response.data.status, 10);
         const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
         const elapsedMinutes = Math.round(elapsedSeconds / 60);
-        
+
         console.log(`[ZAP] Scan ${scanId} progress: ${progress}% (elapsed: ${elapsedMinutes}m ${elapsedSeconds % 60}s)`);
 
         // Check if progress is stuck
@@ -324,7 +324,7 @@ export class ZapClient {
         } else {
           stuckCounter = 0; // Reset counter on progress change
         }
-        
+
         lastProgress = progress;
 
         if (onProgress) {
@@ -349,7 +349,7 @@ export class ZapClient {
       }
     }
 
-    throw new Error(`ZAP scan ${scanId} did not complete within ${Math.round(effectiveMaxWaitMs / 60000)} minutes (timeout: ${scanDepth || 'unknown' } scan)`);
+    throw new Error(`ZAP scan ${scanId} did not complete within ${Math.round(effectiveMaxWaitMs / 60000)} minutes (timeout: ${scanDepth || 'unknown'} scan)`);
   }
 
   /**
@@ -383,11 +383,11 @@ export class ZapClient {
 
       let alerts: ZapAlert[] = response.data.alerts || [];
       console.log(`[ZAP] Retrieved ${alerts.length} alerts from scan${scanId ? ` ${scanId}` : ''}`);
-      
+
       if (alerts.length > 0) {
         console.log(`[ZAP] Sample alert - Title: "${alerts[0].alert || alerts[0].name}", Risk: "${alerts[0].risk || alerts[0].riskCode || alerts[0].riskcode}"`);
       }
-      
+
       // If caller provided a filterUrl, narrow alerts to those matching the target
       if (filterUrl) {
         try {
@@ -462,6 +462,7 @@ export class ZapClient {
           param: alert.param || null,
           riskCode: alert.riskCode || alert.riskcode,
           sourceRisk: alert.risk,
+          sourceTool: 'ZAP',
         },
       };
     });
@@ -504,7 +505,7 @@ export class ZapClient {
 
       // Get results - retry if empty for deep scans
       let alerts = await this.getAlerts(scanId, targetUrl);
-      
+
       // For deep scans, if we get no alerts, wait a moment and try again
       // (sometimes there's a race condition with alert retrieval)
       if (scanDepth === "deep" && alerts.length === 0) {
@@ -515,7 +516,7 @@ export class ZapClient {
           console.log(`[ZAP] Still no alerts after retry - this scan genuinely found no vulnerabilities`);
         }
       }
-      
+
       const vulnerabilities = this.convertAlertsToVulnerabilities(alerts);
 
       return { alerts, vulnerabilities };
