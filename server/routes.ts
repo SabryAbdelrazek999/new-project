@@ -16,7 +16,6 @@ let currentApiKey: string = "zap_sk_" + Math.random().toString(36).substring(2, 
 function authenticateToken(req: any, res: any, next: any) {
   // Check API Key first (query param for downloads)
   const apiKey = req.query.apiKey as string;
-  // console.log("Checking auth. apiKey:", apiKey, "currentApiKey:", currentApiKey);
 
   if (apiKey && apiKey === currentApiKey) {
     (req as any).isApiKeyAuth = true;
@@ -24,7 +23,6 @@ function authenticateToken(req: any, res: any, next: any) {
   }
 
   const token = req.headers.authorization?.split(" ")[1] || req.cookies?.token;
-  // console.log("Checking token. found:", !!token);
 
   if (!token) return res.status(401).json({ error: "Not authenticated" });
 

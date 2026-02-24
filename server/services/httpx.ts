@@ -312,8 +312,6 @@ function analyzeHeaders(
  * ──────────────────────────────────────────────────────────────────────────*/
 export const httpxService = {
   async scan(url: string) {
-    console.log(`[Httpx] Probing target: ${url}`);
-
     let statusCode: number | undefined;
     let headers: Record<string, any> = {};
     let body = '';
@@ -323,9 +321,7 @@ export const httpxService = {
       const headRes = await axios.head(url, BASE_CONFIG);
       statusCode = headRes.status;
       headers = headRes.headers as Record<string, any>;
-      console.log(`[Httpx] HEAD succeeded — HTTP ${statusCode}`);
     } catch (headErr: any) {
-      console.warn(`[Httpx] HEAD failed (${headErr.message}), trying GET...`);
 
       // ── Attempt 2: GET request (full body, parses title) ─────────────────
       try {
@@ -337,7 +333,6 @@ export const httpxService = {
         statusCode = getRes.status;
         headers = getRes.headers as Record<string, any>;
         body = typeof getRes.data === 'string' ? getRes.data : '';
-        console.log(`[Httpx] GET succeeded — HTTP ${statusCode}`);
       } catch (getErr: any) {
         // Both attempts failed — surface a clear error so scanner can catch it
         const msg = getErr.code === 'ECONNREFUSED'
@@ -346,7 +341,6 @@ export const httpxService = {
             ? `Request timed out for ${url}`
             : `Network error: ${getErr.message}`;
 
-        console.error(`[Httpx] ❌ Both HEAD and GET failed: ${msg}`);
         throw new Error(msg);
       }
     }
@@ -371,8 +365,6 @@ export const httpxService = {
     const webserver = headers['server'] || headers['x-powered-by'] || 'Unknown';
     const contentType = headers['content-type'] || 'Unknown';
 
-    console.log(`[Httpx] ✅ Result — status: ${statusCode}, server: ${webserver}, title: "${title}"`);
-
     return {
       isUp: statusCode !== undefined && statusCode < 500,
       statusCode: statusCode ?? 0,
@@ -393,8 +385,6 @@ export const httpxService = {
     url: string,
     scanId: string,
   ): Promise<InsertVulnerability[]> {
-    console.log(`[Httpx] 🔍 Starting shallow vulnerability analysis for: ${url}`);
-
     let statusCode = 0;
     let headers: Record<string, any> = {};
     let body = '';
@@ -406,14 +396,11 @@ export const httpxService = {
       headers = result.headers;
       body = result.body;
       title = result.title;
-    } catch (err: any) {
-      console.warn(`[Httpx] analyzeVulnerabilities: scan failed — ${err.message}`);
+    } catch {
       return [];
     }
 
     const raw = analyzeHeaders(url, statusCode, headers, body, title);
-
-    console.log(`[Httpx] ✅ Shallow analysis found ${raw.length} findings`);
 
     // Convert to InsertVulnerability format and stamp the source tool
     return raw.map((f) => ({

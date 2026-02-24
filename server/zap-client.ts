@@ -52,7 +52,6 @@ export class ZapClient {
     // When running on host machine, use localhost:8081 (docker-compose port mapping)
     // In Docker container, would use: zap service name
     this.baseUrl = baseUrl || process.env.ZAP_API_URL || "http://localhost:8081";
-    console.log(`[ZAP] Initialized client with base URL: ${this.baseUrl}`);
   }
 
   /**
@@ -61,17 +60,14 @@ export class ZapClient {
   async isReady(maxAttempts = 30, initialDelay = 2000): Promise<boolean> {
     for (let i = 0; i < maxAttempts; i++) {
       try {
-        console.log(`[ZAP] Checking daemon readiness (attempt ${i + 1}/${maxAttempts})...`);
         const response = await this.client.get(`${this.baseUrl}`, {
           timeout: 10000,
         });
         if (response.status === 200) {
-          console.log('[ZAP] ✅ Daemon is ready!');
           return true;
         }
       } catch (error: any) {
         const delay = initialDelay * Math.pow(1.5, i); // Exponential backoff
-        console.log(`[ZAP] ⏳ Attempt ${i + 1} failed: ${error.message}. Retrying in ${Math.round(delay / 1000)}s...`);
 
         if (i < maxAttempts - 1) {
           await new Promise(resolve => setTimeout(resolve, delay));
@@ -89,14 +85,11 @@ export class ZapClient {
    */
   async clearSession(): Promise<void> {
     try {
-      console.log('[ZAP] Creating new session to clear database...');
       await this.client.get(
         `${this.baseUrl}/JSON/core/action/newSession?overwrite=true`,
         { timeout: 60000 } // Increased to 60s
       );
-      console.log('[ZAP] ✅ New session created, database cleared');
     } catch (error: any) {
-      console.log(`[ZAP] ⚠️  Could not create new session: ${error.message}`);
       // Non-fatal, continue anyway
     }
   }
@@ -106,13 +99,11 @@ export class ZapClient {
    */
   async stopScan(scanId: string): Promise<void> {
     try {
-      console.log(`[ZAP] Stopping active scan ${scanId}...`);
       await this.client.get(
         `${this.baseUrl}/JSON/ascan/action/stop?scanId=${scanId}`,
         { timeout: 10000 }
       );
       this.activeScanIds.delete(scanId);
-      console.log(`[ZAP] ✅ Scan ${scanId} stopped`);
     } catch (error: any) {
       console.error(`[ZAP] Failed to stop scan ${scanId}:`, error.message);
     }
@@ -123,13 +114,11 @@ export class ZapClient {
    */
   async stopAllScans(): Promise<void> {
     try {
-      console.log('[ZAP] Stopping all active scans...');
       await this.client.get(
         `${this.baseUrl}/JSON/ascan/action/stopAllScans`,
         { timeout: 10000 }
       );
       this.activeScanIds.clear();
-      console.log('[ZAP] ✅ All scans stopped');
     } catch (error: any) {
       console.error('[ZAP] Failed to stop all scans:', error.message);
     }
@@ -141,7 +130,6 @@ export class ZapClient {
    */
   async startScan(targetUrl: string, scanDepth: string = "medium"): Promise<string> {
     try {
-      console.log(`[ZAP] Starting active scan for ${targetUrl} (depth: ${scanDepth})`);
 
       // First, add URL to context
       const encodedUrl = encodeURIComponent(targetUrl);
@@ -152,9 +140,7 @@ export class ZapClient {
           `${this.baseUrl}/JSON/core/action/accessUrl?url=${encodedUrl}`,
           { timeout: 60000 }
         );
-        console.log(`[ZAP] ✅ URL accessed: ${targetUrl}`);
       } catch (err) {
-        console.log(`[ZAP] ⚠️  Could not access URL directly, continuing...`);
       }
 
       // Step 2: Spider the target (configure based on depth)
@@ -182,7 +168,6 @@ export class ZapClient {
           { timeout: 60000 }
         );
         const spiderScanId = spiderResponse.data.scan;
-        console.log(`[ZAP] Spider started with ID: ${spiderScanId} (maxChildren: ${maxChildren}, maxDepth: ${maxDepth}, maxDuration: ${maxDuration}min)`);
 
         // Wait for spider to complete. Use flexible timeouts for different site sizes
         // to keep quick scans fast while allowing deeper scans more time.
@@ -193,7 +178,6 @@ export class ZapClient {
 
         await this.waitForSpider(spiderScanId, spiderTimeoutMs);
       } catch (err: any) {
-        console.log(`[ZAP] ⚠️  Spider failed or timed out: ${err.message}, continuing with active scan...`);
       }
 
       // Step 3: Start active scan with policy and scan settings based on depth
@@ -202,15 +186,12 @@ export class ZapClient {
       // Configure scan settings based on depth
       if (scanDepth === "deep") {
         // For deep scans: aggressive settings
-        console.log(`[ZAP] Configuring DEEP scan policy (aggressive)...`);
         scanUrl += `&policyName=Policy%20deep&enableAllScanners=true`;
       } else if (scanDepth === "medium") {
         // For medium scans: balanced settings
-        console.log(`[ZAP] Configuring MEDIUM scan policy (balanced)...`);
         scanUrl += `&policyName=Policy%20standard`;
       } else {
         // For shallow scans: use standard policy for more coverage  
-        console.log(`[ZAP] Configuring SHALLOW scan policy (standard for better coverage)...`);
         scanUrl += `&policyName=Policy%20standard`;
       }
 
@@ -218,10 +199,8 @@ export class ZapClient {
       let response;
       try {
         response = await this.client.get(scanUrl, { timeout: 60000 });
-        console.log(`[ZAP] ✅ Scan configured with depth-specific settings: ${scanDepth}`);
       } catch (policyError: any) {
         // If policy fails, try without it (uses default)
-        console.log(`[ZAP] ⚠️  Policy configuration failed, using default policy...`);
         response = await this.client.get(
           `${this.baseUrl}/JSON/ascan/action/scan?url=${encodedUrl}&recurse=true&inScopeOnly=false`,
           { timeout: 60000 }
@@ -230,7 +209,6 @@ export class ZapClient {
 
       const scanId = String(response.data.scan);
       this.activeScanIds.add(scanId);
-      console.log(`[ZAP] ✅ Active scan started with ID: ${scanId}`);
       return scanId;
     } catch (error: any) {
       console.error("[ZAP] Failed to start scan:", error.message);
@@ -258,10 +236,8 @@ export class ZapClient {
           { timeout: 30000 }
         );
         const progress = parseInt(response.data.status, 10);
-        console.log(`[ZAP] Spider ${scanId} progress: ${progress}%`);
 
         if (progress === 100) {
-          console.log(`[ZAP] ✅ Spider ${scanId} completed`);
           // Give it a moment to settle
           await new Promise(resolve => setTimeout(resolve, 2000));
           return;
@@ -288,7 +264,6 @@ export class ZapClient {
     if (scanDepth === "deep") {
       // For deep scans, add 50% buffer to the expected time
       effectiveMaxWaitMs = Math.ceil(maxWaitMs * 1.5);
-      console.log(`[ZAP] ⏱️  Deep scan: effective timeout increased from ${maxWaitMs}ms to ${effectiveMaxWaitMs}ms`);
     }
 
     const startTime = Date.now();
@@ -300,7 +275,6 @@ export class ZapClient {
       try {
         // Check if scan was aborted
         if (abortSignal?.aborted) {
-          console.log(`[ZAP] Scan ${scanId} aborted by user, stopping ZAP scan...`);
           await this.stopScan(scanId);
           throw new Error("Scan cancelled by user");
         }
@@ -313,13 +287,11 @@ export class ZapClient {
         const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
         const elapsedMinutes = Math.round(elapsedSeconds / 60);
 
-        console.log(`[ZAP] Scan ${scanId} progress: ${progress}% (elapsed: ${elapsedMinutes}m ${elapsedSeconds % 60}s)`);
 
         // Check if progress is stuck
         if (progress === lastProgress && progress < 100) {
           stuckCounter++;
           if (stuckCounter % 30 === 0) { // Every 60 seconds (30 * 2s)
-            console.log(`[ZAP] ⚠️  Scan progress stuck at ${progress}% for ${stuckCounter * 2}s`);
           }
         } else {
           stuckCounter = 0; // Reset counter on progress change
@@ -333,7 +305,6 @@ export class ZapClient {
 
         if (progress === 100) {
           this.activeScanIds.delete(scanId);
-          console.log(`[ZAP] ✅ Scan ${scanId} completed after ${elapsedMinutes}m`);
           return;
         }
 
@@ -368,7 +339,6 @@ export class ZapClient {
             { timeout: 30000 }
           );
         } catch (e) {
-          console.log(`[ZAP] Warning: Failed to get alerts with scanId, falling back to all alerts...`);
           response = await this.client.get(
             `${this.baseUrl}/JSON/core/view/alerts`,
             { timeout: 30000 }
@@ -382,10 +352,8 @@ export class ZapClient {
       }
 
       let alerts: ZapAlert[] = response.data.alerts || [];
-      console.log(`[ZAP] Retrieved ${alerts.length} alerts from scan${scanId ? ` ${scanId}` : ''}`);
 
       if (alerts.length > 0) {
-        console.log(`[ZAP] Sample alert - Title: "${alerts[0].alert || alerts[0].name}", Risk: "${alerts[0].risk || alerts[0].riskCode || alerts[0].riskcode}"`);
       }
 
       // If caller provided a filterUrl, narrow alerts to those matching the target
@@ -402,7 +370,6 @@ export class ZapClient {
               return String(a.url || '').includes(host);
             }
           });
-          console.log(`[ZAP] Filtered alerts to ${alerts.length} items matching host ${host}`);
         } catch (e) {
           // ignore filtering errors
         }
@@ -419,16 +386,9 @@ export class ZapClient {
    * Convert ZAP alerts to our vulnerability format
    */
   convertAlertsToVulnerabilities(alerts: ZapAlert[]): ZapScanResult["vulnerabilities"] {
-    console.log(`[ZAP] Converting ${alerts.length} alerts to vulnerabilities`);
     if (alerts.length > 0) {
-      console.log(`[ZAP] Debug - First alert keys: ${Object.keys(alerts[0]).join(", ")}`);
       const first = alerts[0];
-      console.log(`[ZAP] Debug - First alert details:`);
-      console.log(`  - Name: ${first.alert || first.name || first.pluginName}`);
-      console.log(`  - RiskCode: ${first.riskCode}, riskcode: ${first.riskcode}, risk: ${first.risk}`);
-      console.log(`  - URL: ${first.url}`);
     } else {
-      console.log(`[ZAP] Warning: No alerts to convert - scan may not have found vulnerabilities or alerts were not retrieved`);
     }
 
     const riskMap: Record<string, "critical" | "high" | "medium" | "low"> = {
@@ -509,11 +469,9 @@ export class ZapClient {
       // For deep scans, if we get no alerts, wait a moment and try again
       // (sometimes there's a race condition with alert retrieval)
       if (scanDepth === "deep" && alerts.length === 0) {
-        console.log(`[ZAP] Deep scan returned no alerts on first try, waiting 5 seconds and retrying...`);
         await new Promise(resolve => setTimeout(resolve, 5000));
         alerts = await this.getAlerts(scanId, targetUrl);
         if (alerts.length === 0) {
-          console.log(`[ZAP] Still no alerts after retry - this scan genuinely found no vulnerabilities`);
         }
       }
 

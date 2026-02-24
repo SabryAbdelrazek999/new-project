@@ -10,8 +10,5 @@ const data = {
 const result = insertScheduledScanSchema.safeParse(data);
 
 if (result.success) {
-  console.log("Validation successful");
 } else {
-  console.log("Validation failed");
-  console.log(JSON.stringify(result.error, null, 2));
 }

@@ -100,11 +100,9 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
       throw new Error("Scan cancelled by user");
     }
 
-    console.log(`[Scanner] Starting ${scanType} scan pipeline for ${targetUrl}`);
 
     // --- Stage 1: Target Validation (Httpx) ---
     if (controller.signal.aborted) throw new Error("Scan cancelled by user");
-    console.log(`[Scanner] Stage 1: Validating target with Httpx...`);
     await updateProgressSmooth(scanId, 0, 10, 3000, controller);
 
     let targetValidated = false;
@@ -114,7 +112,6 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
       const httpxResult: any = await httpxService.scan(targetUrl);
 
       if (httpxResult && httpxResult.statusCode && httpxResult.statusCode < 500) {
-        console.log(`[Scanner] ✅ Target validated via Httpx (HTTP ${httpxResult.statusCode})`);
         targetValidated = true;
         targetInfo = {
           status: httpxResult.statusCode,
@@ -155,11 +152,9 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
 
     // --- Shallow Scan: HTTP Header & Response Vulnerability Analysis (httpx) ---
     if (scanType === "shallow") {
-      console.log(`[Scanner] Stage 1b: Running shallow header vulnerability analysis...`);
       try {
         const headerFindings = await httpxService.analyzeVulnerabilities(targetUrl, scanId);
         if (headerFindings.length > 0) {
-          console.log(`[Scanner] ✅ Shallow analysis found ${headerFindings.length} header-based findings`);
           vulnerabilities.push(...headerFindings);
           for (const f of headerFindings) {
             switch (f.severity) {
@@ -171,7 +166,6 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
             }
           }
         } else {
-          console.log(`[Scanner] Shallow header analysis returned no additional findings`);
         }
       } catch (headerErr: any) {
         console.warn(`[Scanner] ⚠️  Shallow header analysis failed: ${headerErr.message}`);
@@ -182,10 +176,8 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
     if (controller.signal.aborted) throw new Error("Scan cancelled by user");
 
     if (scanType === "shallow") {
-      console.log(`[Scanner] Stage 2: Nmap - Skipped (shallow mode)`);
       await updateProgressSmooth(scanId, 10, 30, 1000, controller);
     } else {
-      console.log(`[Scanner] Stage 2: Nmap - Port scanning (${scanType} mode)...`);
 
       let nmapDuration = scanType === "deep" ? 8000 : 4000;
       await updateProgressSmooth(scanId, 10, 30, nmapDuration, controller);
@@ -207,7 +199,6 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
           });
           lowCount++;
         } else {
-          console.log(`[Scanner] Nmap completed but found no open ports`);
         }
       } catch (nmapError: any) {
         console.warn(`[Scanner] ⚠️  Nmap failed: ${nmapError.message}, continuing scan...`);
@@ -218,10 +209,8 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
     if (controller.signal.aborted) throw new Error("Scan cancelled by user");
 
     if (scanType === "shallow") {
-      console.log(`[Scanner] Stage 3: Nikto - Skipped (shallow mode)`);
       await updateProgressSmooth(scanId, 30, 45, 1000, controller);
     } else {
-      console.log(`[Scanner] Stage 3: Nikto - Web server scanning (${scanType} mode)...`);
 
       let niktoDuration = scanType === "deep" ? 10000 : 3000;
       await updateProgressSmooth(scanId, 30, 45, niktoDuration, controller);
@@ -244,7 +233,6 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
         }
 
         if (niktoResult.vulnerabilities.length === 0) {
-          console.log(`[Scanner] Nikto completed but found no issues`);
         }
       } catch (niktoError: any) {
         console.warn(`[Scanner] ⚠️  Nikto failed: ${niktoError.message}, continuing scan...`);
@@ -253,7 +241,6 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
 
     // --- Stage 4: OWASP ZAP (Always run, but with different settings) ---
     if (controller.signal.aborted) throw new Error("Scan cancelled by user");
-    console.log(`[Scanner] Stage 4: ZAP - Active scanning (${scanType} mode)...`);
 
     let zapResult: any = { vulnerabilities: [] };
     try {
@@ -275,7 +262,6 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
           expectedZapDuration = 600000; // 10 minutes
         }
 
-        console.log(`[Scanner] 🔍 ZAP scan starting with expected duration: ${Math.round(expectedZapDuration / 60000)} minutes`);
 
         zapResult = await zapClient.performScan(targetUrl, scanType, async (progress) => {
           const elapsed = Date.now() - startZapTime;
@@ -286,10 +272,8 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
 
           const elapsedSeconds = Math.round(elapsed / 1000);
           const expectedSeconds = Math.round(expectedZapDuration / 1000);
-          console.log(`[Scanner] ZAP progress: ${progress}% (mapped: ${mappedProgress}%, elapsed: ${elapsedSeconds}s of ~${expectedSeconds}s)`);
         }, controller.signal);
 
-        console.log(`[Scanner] 📊 ZAP scan complete with ${zapResult.vulnerabilities?.length || 0} vulnerabilities found`);
 
         if (lastZapProgress < 90) {
           await updateProgressSmooth(scanId, lastZapProgress, 90, 2000, controller);
@@ -323,21 +307,17 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
     }
 
     // --- Finalization: Normalize then Deduplicate ---
-    console.log(`[Scanner] ✅ Pipeline complete. Processing ${vulnerabilities.length} findings...`);
 
     // Step 1 — normalize: unify names, severities, and stamp sourceTool
     const normalizedVulnerabilities = vulnerabilities.map((v) =>
       normalizeVulnerability(v, ((v.details as any)?.sourceTool) || 'System')
     );
-    console.log(`[Scanner] 🔧 Normalization complete for ${normalizedVulnerabilities.length} findings`);
 
     // Step 2 — deduplicate (works on canonical titles, so cross-tool dupes are caught)
     const { deduplicated, removedCount, duplicateInfo } = deduplicateVulnerabilities(normalizedVulnerabilities);
 
-    console.log(`[Scanner] 🔍 Deduplication: Removed ${removedCount} duplicate vulnerabilities`);
     if (duplicateInfo.length > 0) {
       for (const d of duplicateInfo) {
-        console.log(`[Scanner]    • "${d.original}" — ${d.duplicates} duplicate(s) merged`);
       }
     }
 
@@ -353,7 +333,6 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
       }
     }
 
-    console.log(`[Scanner] ✅ Final results: ${finalVulnerabilities.length} unique vulnerabilities`);
 
     await updateProgressSmooth(scanId, 90, 100, 2000, controller);
 
@@ -401,7 +380,6 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
 
   } catch (error: any) {
     if (error.message === "Scan cancelled by user") {
-      console.log(`[Scanner] ❌ Scan cancelled by user`);
       activeScanAbortControllers.delete(scanId);
       clearProgressInterval();
 

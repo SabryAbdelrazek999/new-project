@@ -425,7 +425,6 @@ export class DbStorage implements IStorage {
     });
 
     this.db = drizzle(this.pool);
-    console.log("✅ PostgreSQL connected successfully");
   }
 
   // Users
