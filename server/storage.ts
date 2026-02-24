@@ -9,8 +9,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/node-postgres";
-import pkg from "pg";
-const { Pool } = pkg;
+import { Pool } from "pg";
 import { eq, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
@@ -204,6 +203,7 @@ export class MemStorage implements IStorage {
       highCount: 0,
       mediumCount: 0,
       lowCount: 0,
+      infoCount: 0,
     };
     this.scans.set(id, scan);
     return scan;
@@ -239,7 +239,7 @@ export class MemStorage implements IStorage {
   }
 
   async resetActiveScans(): Promise<void> {
-    for (const scan of this.scans.values()) {
+    for (const scan of Array.from(this.scans.values())) {
       if (scan.status === "running" || scan.status === "pending") {
         const updatedScan: Scan = { ...scan, status: "failed", completedAt: new Date() };
         this.scans.set(scan.id, updatedScan);
