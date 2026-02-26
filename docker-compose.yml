@@ -17,6 +17,7 @@ services:
     environment:
       - TZ=Africa/Cairo
       - NODE_ENV=production
+      - HOST_PORT=5000
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:5000/health" ]
       interval: 30s

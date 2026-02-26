@@ -110,7 +110,7 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
 
     try {
       const httpxResult: any = await httpxService.scan(targetUrl);
-
+      console.log(`[Scanner] 🔍 Httpx scan complete — status: ${httpxResult?.statusCode}, server: ${httpxResult?.webserver || 'unknown'}`);
       if (httpxResult && httpxResult.statusCode && httpxResult.statusCode < 500) {
         targetValidated = true;
         targetInfo = {
@@ -155,6 +155,7 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
       try {
         const headerFindings = await httpxService.analyzeVulnerabilities(targetUrl, scanId);
         if (headerFindings.length > 0) {
+          console.log(`[Scanner] ✅ Header analysis found ${headerFindings.length} finding(s)`);
           vulnerabilities.push(...headerFindings);
           for (const f of headerFindings) {
             switch (f.severity) {
@@ -166,6 +167,7 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
             }
           }
         } else {
+          console.log(`[Scanner] ℹ️  No header vulnerabilities found`);
         }
       } catch (headerErr: any) {
         console.warn(`[Scanner] ⚠️  Shallow header analysis failed: ${headerErr.message}`);
@@ -183,9 +185,11 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
       await updateProgressSmooth(scanId, 10, 30, nmapDuration, controller);
 
       try {
+        console.log(`[Scanner] 🔍 Stage 2: Running Nmap on ${hostname}...`);
         const nmapResult = await nmapService.scan(hostname, scanType);
 
         if (nmapResult.openPorts.length > 0) {
+          console.log(`[Scanner] ✅ Nmap found ${nmapResult.openPorts.length} open port(s)`);
           const portsDesc = nmapResult.openPorts.map(p => `${p.port}/${p.protocol} (${p.service})`).join(", ");
           vulnerabilities.push({
             scanId,
@@ -199,6 +203,7 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
           });
           lowCount++;
         } else {
+          console.log(`[Scanner] ℹ️  Nmap: no open ports found`);
         }
       } catch (nmapError: any) {
         console.warn(`[Scanner] ⚠️  Nmap failed: ${nmapError.message}, continuing scan...`);
@@ -216,6 +221,7 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
       await updateProgressSmooth(scanId, 30, 45, niktoDuration, controller);
 
       try {
+        console.log(`[Scanner] 🔍 Stage 3: Running Nikto on ${targetUrl}...`);
         const niktoResult = await niktoService.scan(targetUrl, scanType);
 
         for (const v of niktoResult.vulnerabilities) {
@@ -233,6 +239,9 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
         }
 
         if (niktoResult.vulnerabilities.length === 0) {
+          console.log(`[Scanner] ℹ️  Nikto: no vulnerabilities found`);
+        } else {
+          console.log(`[Scanner] ✅ Nikto found ${niktoResult.vulnerabilities.length} issue(s)`);
         }
       } catch (niktoError: any) {
         console.warn(`[Scanner] ⚠️  Nikto failed: ${niktoError.message}, continuing scan...`);
@@ -263,6 +272,7 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
         }
 
 
+        console.log(`[Scanner] 🔍 Stage 4: Running ZAP ${scanType} scan on ${targetUrl}...`);
         zapResult = await zapClient.performScan(targetUrl, scanType, async (progress) => {
           const elapsed = Date.now() - startZapTime;
           const mappedProgress = 45 + Math.floor((progress / 100) * 45);
@@ -272,8 +282,9 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
 
           const elapsedSeconds = Math.round(elapsed / 1000);
           const expectedSeconds = Math.round(expectedZapDuration / 1000);
+          console.log(`[Scanner] ⏳ ZAP progress: ${progress}% (elapsed: ${elapsedSeconds}s / ~${expectedSeconds}s)`);
         }, controller.signal);
-
+        console.log(`[Scanner] ✅ ZAP scan complete`);
 
         if (lastZapProgress < 90) {
           await updateProgressSmooth(scanId, lastZapProgress, 90, 2000, controller);
@@ -317,7 +328,9 @@ export async function performScan(scanId: string, targetUrl: string, scanType: s
     const { deduplicated, removedCount, duplicateInfo } = deduplicateVulnerabilities(normalizedVulnerabilities);
 
     if (duplicateInfo.length > 0) {
+      console.log(`[Scanner] 🧹 Removed ${removedCount} duplicate(s) after normalization`);
       for (const d of duplicateInfo) {
+        console.log(`  - Duplicate: "${d}"`);
       }
     }
 

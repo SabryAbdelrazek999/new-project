@@ -60,7 +60,7 @@ export function log(message: string, source = "express") {
     second: "2-digit",
     hour12: true,
   });
-
+  console.log(`${formattedTime} [${source}] ${message}`);
 }
 
 app.use((req, res, next) => {
@@ -116,13 +116,19 @@ app.use((req, res, next) => {
 
   const port = parseInt(process.env.PORT || "5000", 10);
   const host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "localhost";
+  let started = false;
   httpServer.listen(
     {
       port,
       host,
     },
     () => {
+      if (started) return;
+      started = true;
       log(`serving on host ${host} port ${port}`);
+      const hostPort = process.env.HOST_PORT || port;
+      console.log(`\x1b[33m[ZAP App]\x1b[0m Local:  http://localhost:${hostPort}`);
+      console.log(`\x1b[33m[ZAP App]\x1b[32m domain is ready ✓\x1b[0m`);
     },
   );
 })();
